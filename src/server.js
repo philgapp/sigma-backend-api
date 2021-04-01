@@ -20,21 +20,34 @@ export const start = async () => {
         const UnderlyingTrades = db.collection('underlyingtrades')
         const UnderlyingHistories = db.collection('underlyinghistories')
 
+        const tests = [
+            {_id:'dsdfser',title:'Test 1',content:'Test 1 content'},
+            {_id:'dsdfser2',title:'Test 2',content:'Test 2 content'},
+            {_id:'dsdfser3',title:'Test 3',content:'Test 3 content'},
+            {_id:'dsdfser4',title:'Test 4',content:'Test 4 content'}
+        ]
 
         const typeDefs = [`
       type Query {
+        viewTest(_id: ID!): Test
+        viewTests: [Test]
         user(_id: String): User
         users: [User]
         option(_id: String): Option
-        options: [Option]
+        getOptionsByUser(_id: String): [Option]
         spread(_id: String): Spread
         spreads: [Spread]
         leg(_id: String): Leg
         legs: [Leg]
-        underlyingtrade(_id: String): UnderlyingTrade
-        underlyingtrades: [UnderlyingTrade]
-        underlyinghistory(_id: String): UnderlyingHistory
-        underlyinghistories: [UnderlyingHistory]
+        underlyingTrade(_id: String): UnderlyingTrade
+        underlyingTrades: [UnderlyingTrade]
+        underlyingHistory(_id: String): UnderlyingHistory
+        underlyingHistories: [UnderlyingHistory]
+      }
+      type Test {
+        _id: String
+        title: String
+        content: String
       }
       type User {
         _id: String
@@ -48,6 +61,8 @@ export const start = async () => {
         _id: String
         ticker: String
         type: String
+        spreads: [Spread]
+        legs: [Leg]
       }
       type Spread {
         _id: String
@@ -74,8 +89,12 @@ export const start = async () => {
         _id: String
         ticker: String
       }
+      input OptionInput {
+        ticker: String
+        type: String
+      }
       type Mutation {
-        createOption(ticker: String, type: String): Option
+        createOption(input: OptionInput): Option
         createSpread(optionId: String, content: String): Spread
         createSpreadLeg(spreadId: String, content: String): Leg
         createOptionLeg(optionId: String, content: String): Leg
@@ -90,17 +109,27 @@ export const start = async () => {
 
         const resolvers = {
             Query: {
+                viewTest: async (root, args) => {
+                    const id = args._id
+                    const res = tests.filter(function(test) {
+                        return test._id === id
+                    })
+                    return res[0]
+                },
+                viewTests: () => {
+                    return tests
+                },
                 option: async (root, {_id}) => {
                     return prepare(await Options.findOne(ObjectId(_id)))
                 },
-                options: async () => {
+                getOptionsByUser: async () => {
                     return (await Options.find({}).toArray()).map(prepare)
                 },
                 spread: async (root, {_id}) => {
                     return prepare(await Spreads.findOne(ObjectId(_id)))
                 },
             },
-            Post: {
+            /*Post: {
                 comments: async ({_id}) => {
                     return (await Comments.find({postId: _id}).toArray()).map(prepare)
                 }
@@ -109,16 +138,16 @@ export const start = async () => {
                 post: async ({postId}) => {
                     return prepare(await Posts.findOne(ObjectId(postId)))
                 }
-            },
+            },*/
             Mutation: {
                 createOption: async (root, args, context, info) => {
                     const res = await Options.insertOne(args)
                     return prepare(res.ops[0])  // https://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#~insertOneWriteOpResult
                 },
-                createComment: async (root, args) => {
+                /*createComment: async (root, args) => {
                     const res = await Comments.insert(args)
                     return prepare(await Comments.findOne({_id: res.insertedIds[1]}))
-                },
+                },*/
             },
         }
 
