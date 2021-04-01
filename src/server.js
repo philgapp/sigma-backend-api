@@ -30,11 +30,23 @@ export const start = async () => {
             {_id:'dsdfser4',title:'Test 4',content:'Test 4 content'}
         ]
 
+        const testOptions = [
+
+        ]
+
+        const testSpreads = [
+
+        ]
+
+        const testLegs = [
+
+        ]
+
         const typeDefs = [`
       type Query {
         viewTest(_id: ID!): Test
         viewTests: [Test]
-        user(_id: String): User
+        user(_id: ID): User
         users: [User]
         option(_id: String): Option
         getOptionsByUser(_id: String): [Option]
@@ -48,34 +60,32 @@ export const start = async () => {
         underlyingHistories: [UnderlyingHistory]
       }
       type Test {
-        _id: String
+        _id: ID
         title: String
         content: String
       }
       type User {
-        _id: String
+        _id: ID
         firstName: String
         lastName: String
         email: String
-        authType: String
+        authType: AuthType
         password: String
       }
       type Option {
-        _id: String
+        _id: ID
         symbol: String!
         type: OptionType!
         spreads: [Spread]
         legs: [Leg]
       }
       type Spread {
-        _id: String
-        optionId: String
+        _id: ID
         legs: [Leg]
       }
       type Leg {
-        _id: String
-        optionId: String
-        spreadId: String
+        _id: ID
+        isSpread: Boolean
         entryDate: Date
         expirationDate: Date
         exitDate: Date
@@ -98,17 +108,19 @@ export const start = async () => {
         notes: String
         riskMitigation: String
       }
+      type UnderlyingHistory {
+        _id: ID
+        ticker: String
+        startDate: Date
+        endDate: Date
+        underlyingTrades: [UnderlyingTrade]!
+      }
       type UnderlyingTrade {
-        _id: String
-        underlyingHistoryId: String
-        type: String
+        _id: ID
+        type: UnderlyingTradeType
         date: String
         shares: String
         price: String
-      }
-      type UnderlyingHistory {
-        _id: String
-        ticker: String
       }
       input OptionInput {
         ticker: String
@@ -123,6 +135,10 @@ export const start = async () => {
         createUnderlyingHistory(ticker: String) : UnderlyingHistory
       }
       scalar Date
+      enum AuthType {
+        LOCAL
+        GOOGLE
+      }
       enum OptionType {
         P
         C
@@ -130,6 +146,17 @@ export const start = async () => {
         BUCS
         BEPS
         BECS
+      }
+      enum DirectionType {
+        BUY
+        SELL
+      }
+      enum UnderlyingTradeType {
+        BUY
+        SELL
+        ASSIGNED
+        CALLED
+        DIVIDEND
       }
       schema {
         query: Query
@@ -152,7 +179,8 @@ export const start = async () => {
                 option: async (root, {_id}) => {
                     return prepare(await Options.findOne(ObjectId(_id)))
                 },
-                getOptionsByUser: async () => {
+                getOptionsByUser: async (root, args) => {
+                    const userId = args._id
                     return (await Options.find({}).toArray()).map(prepare)
                 },
                 spread: async (root, {_id}) => {
