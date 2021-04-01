@@ -4,6 +4,9 @@ import bodyParser from 'body-parser'
 import cors from 'cors'
 import {prepare} from "./util"
 import {makeExecutableSchema} from 'graphql-tools'
+// Next two imports required to create custom Date scalar type
+import {GraphQLScalarType} from "graphql";
+import { Kind } from 'graphql/language';
 
 const { graphqlHTTP } = require('express-graphql');
 
@@ -59,23 +62,41 @@ export const start = async () => {
       }
       type Option {
         _id: String
-        ticker: String
-        type: String
+        symbol: String!
+        type: OptionType!
         spreads: [Spread]
         legs: [Leg]
       }
       type Spread {
         _id: String
         optionId: String
-        content: String
-        option: Option
+        legs: [Leg]
       }
       type Leg {
         _id: String
         optionId: String
         spreadId: String
-        content: String
-        option: Option
+        entryDate: Date
+        expirationDate: Date
+        exitDate: Date
+        strike: Float
+        entryCost: Float
+        exitCost: Float
+        underlyingEntryPrice: Float
+        underlyingExitPrice: Float
+        initialPremium: Float
+        actualPremium: Float
+        initialRoi: Float
+        actualRoi: Float
+        initialAroi: Float
+        actualAroi: Float
+        daysInTrade: Int
+        capitalRequirement: Float
+        totalPremium: Float
+        missedPremium: Float
+        result: String
+        notes: String
+        riskMitigation: String
       }
       type UnderlyingTrade {
         _id: String
@@ -100,6 +121,15 @@ export const start = async () => {
         createOptionLeg(optionId: String, content: String): Leg
         createUnderlyingTrade(underlingHistoryId: String) : UnderlyingTrade
         createUnderlyingHistory(ticker: String) : UnderlyingHistory
+      }
+      scalar Date
+      enum OptionType {
+        P
+        C
+        BUPS
+        BUCS
+        BEPS
+        BECS
       }
       schema {
         query: Query
@@ -149,6 +179,22 @@ export const start = async () => {
                     return prepare(await Comments.findOne({_id: res.insertedIds[1]}))
                 },*/
             },
+            Date: new GraphQLScalarType({
+                name: 'Date',
+                description: 'Date custom scalar type',
+                parseValue(value) {
+                    return new Date(value); // value from the client
+                },
+                serialize(value) {
+                    return value.getTime(); // value sent to the client
+                },
+                parseLiteral(ast) {
+                    if (ast.kind === Kind.INT) {
+                        return parseInt(ast.value, 10); // ast value is always in string format
+                    }
+                    return null;
+                },
+            })
         }
 
         const schema = makeExecutableSchema({
