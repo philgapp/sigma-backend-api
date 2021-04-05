@@ -33,6 +33,7 @@ export const start = async () => {
         user(_id: ID): User
         users: [User]
         option(_id: String): Option
+        getDashboardForUser(_id: ID): Dashboard
         getOptionsByUser(_id: ID): [Option]
         spread(_id: String): Spread
         spreads: [Spread]
@@ -50,6 +51,34 @@ export const start = async () => {
         email: String
         authType: AuthType
         password: String
+      }
+      type Dashboard {
+        user: User!
+        balance: Float!
+        aroi: Float!
+        bookedIncome: Float!
+        chart: Chart!
+        options: OptionDashboard!
+        underlying: UnderlyingDashboard!
+      }
+      type Chart {
+        cash: Float!
+        options: Float!
+        underlying: Float!
+      }
+      type OptionDashboard {
+        numberOpen: Int!
+        potentialProfit: Float!
+        nextExpiry: Date!
+      }
+      type UnderlyingDashboard {
+        numberOpen: Int!
+        symbols: [SymbolDashboard] 
+      }
+      type SymbolDashboard  {
+        symbol: String!
+        qty: Int!
+        targetPrice: Float!
       }
       type Option {
         _id: ID!
@@ -177,6 +206,43 @@ export const start = async () => {
                 option: async (root, {_id}) => {
                     return prepare(await Options.findOne(ObjectId(_id)))
                 },
+                getDashboardForUser: async (root, args) => {
+                    const userId = args._id
+                    const dashboard = {}
+                    const userObject = testUsers.filter(function(user) {
+                        return user._id === userId
+                    })
+                    dashboard.user = userObject[0]
+                    dashboard.balance = 55000
+                    dashboard.aroi = 9.09
+                    dashboard.bookedIncome = 5000
+                    dashboard.chart = {
+                        cash: 21000,
+                        options: 30000,
+                        underlying: 4000
+                    }
+                    dashboard.options = {
+                        numberOpen: 8,
+                        potentialProfit: 1500,
+                        nextExpiry: 1621555200000
+                    }
+                    dashboard.underlying = {
+                        numberOpen: 2,
+                        symbols: [
+                            {
+                                symbol: 'TSLA',
+                                qty: 200,
+                                targetPrice: 500.5
+                            },
+                            {
+                                symbol: 'AAPL',
+                                qty: 100,
+                                targetPrice: 130
+                            }
+                        ]
+                    }
+                    return dashboard
+                },
                 getOptionsByUser: async (root, args) => {
                     const userId = args._id
                     const res = (await Options.find({ userId: { $eq: userId } }).toArray()).map(prepare)
@@ -246,6 +312,8 @@ export const start = async () => {
         })
 
         const app = express();
+
+        app.use(cors())
 
         app.use('/graphql', graphqlHTTP({
             schema: schema,
