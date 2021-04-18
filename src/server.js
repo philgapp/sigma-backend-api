@@ -263,6 +263,8 @@ export const start = async () => {
             },
             Mutation: {
                 createOption: async (root, args) => {
+                    console.log('createOption called')
+                    console.log(args)
                     const inputData = args.input
                     // TODO Validate current user....
                     // generate ObjectIds for Option, Spread(s) and Leg(s)
