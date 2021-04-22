@@ -8,6 +8,7 @@ import {makeExecutableSchema} from 'graphql-tools'
 import {GraphQLScalarType} from "graphql";
 import { Kind } from 'graphql/language';
 import { generateTestId, calculateRoi, calculateAroi } from './logic/calculations'
+import { processGoogleToken } from './logic/googleAuth'
 
 const { graphqlHTTP } = require('express-graphql');
 
@@ -159,7 +160,11 @@ export const start = async () => {
         shares: String
         price: String
       }
+      input GoogleAuth {
+        token: String!
+      }
       type Mutation {
+        processGoogleAuth(input: GoogleAuth!): User 
         createOption(input: OptionInput): Option
         createUnderlyingTrade(underlingHistoryId: String) : UnderlyingTrade
         createUnderlyingHistory(ticker: String) : UnderlyingHistory
@@ -262,6 +267,22 @@ export const start = async () => {
               }
             },
             Mutation: {
+                processGoogleAuth: async (root, args) => {
+                    const token = args.input.token
+                    const googleResult = await processGoogleToken(token)
+                    const tempUserResult = {}
+                    tempUserResult._id = "BS_ID"
+                    const nameArray = googleResult.name.split(' ')
+                    tempUserResult.firstName = nameArray[0]
+                    tempUserResult.lastName = nameArray[1]
+                    tempUserResult.email = googleResult.email
+                    tempUserResult.authType = "GOOGLE"
+                    //password: String
+
+                    // TODO handle upsert into DB
+
+                    return tempUserResult
+                },
                 createOption: async (root, args) => {
                     console.log('createOption called')
                     console.log(args)
