@@ -169,7 +169,7 @@ export const start = async () => {
       }
       type Option {
         _id: ID!
-        user: User!
+        userId: ID!
         symbol: String!
         type: OptionType!
         spreads: [Spread]
@@ -304,7 +304,7 @@ export const start = async () => {
                     const sessionId = ctx.session.id ? ctx.session.id : null
                     //console.log('getSession Resolver: user:')
                     //console.log(ctx.session.user)
-                    if(sessionId === null) {
+                    if(sessionId == null) {
                         return ""
                     } else {
                         return sessionId
@@ -428,15 +428,6 @@ export const start = async () => {
                     return prepare(await Spreads.findOne(ObjectId(_id)))
                 },
             },
-            Option: {
-              user: async (root) => {
-                  const id = root.userId
-                  const res = testUsers.filter(function(user) {
-                      return user._id === id
-                  })
-                  return res[0]
-              }
-            },
             Mutation: {
                 upsertUser: async (root, args, ctx) => {
                     // hashIt(password);
@@ -528,8 +519,6 @@ export const start = async () => {
                     //return tempUserResult
                 },
                 createOption: async (root, args) => {
-                    console.log('createOption called')
-                    console.log(args)
                     const inputData = args.input
                     // TODO Validate current user....
                     // generate ObjectIds for Option, Spread(s) and Leg(s)
@@ -537,7 +526,7 @@ export const start = async () => {
                     inputData.spreads[0]._id = new ObjectId
                     const thisLeg = inputData.spreads[0].legs[0]
                     thisLeg._id = new ObjectId
-                    // Set variables and calculate ROI and AROI
+                    // Set input object from input data and calculate ROI, AROI
                     const capitalRequirement = thisLeg.strike
                     const initialPremium = thisLeg.initialPremium
                     const initialRoi = calculateRoi({profit:initialPremium,capital:capitalRequirement})
@@ -559,7 +548,7 @@ export const start = async () => {
                 name: 'Date',
                 description: 'Date custom scalar type',
                 parseValue(value) {
-                    return new Date(value); // value from the client
+                    return value; // value from the client
                 },
                 serialize(value) {
                     return value; // value sent to the client
