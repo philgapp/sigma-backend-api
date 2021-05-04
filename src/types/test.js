@@ -55,6 +55,9 @@ module.exports = `
       type Underlying {
         _id: ID
         userId: ID
+        rawCostBasis: Float
+        adjustedCostBasis: Float
+        minimumCostBasis: Float
         symbol: String
         startDate: Date
         endDate: Date
@@ -62,11 +65,10 @@ module.exports = `
       }
       type UnderlyingTrade {
         _id: ID
-        userId: ID
         type: UnderlyingTradeType
-        date: String
-        shares: String
-        price: String
+        tradeDate: Date
+        shares: Float
+        price: Float
       }
       type Banking {
         _id: ID
@@ -84,6 +86,7 @@ module.exports = `
         open: Boolean
       }
       input UnderlyingInput {
+        _id: ID 
         userId: ID
         symbol: String
         startDate: Date
@@ -91,11 +94,10 @@ module.exports = `
         underlyingTrades: [UnderlyingTradeInput]
       }
       input UnderlyingTradeInput {
-        userId: ID
         type: UnderlyingTradeType
-        date: String
-        shares: String
-        price: String
+        tradeDate: Date
+        shares: Float
+        price: Float
       }
       input LoginInput {
         username: String!
@@ -144,11 +146,11 @@ module.exports = `
         SELL
       }
       enum UnderlyingTradeType {
-        BUY
-        SELL
-        ASSIGNED
-        CALLED
-        DIVIDEND
+        Buy
+        Sell
+        Assigned
+        Called
+        Dividend
       }
       schema {
         query: Query

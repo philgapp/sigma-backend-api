@@ -23,9 +23,7 @@ async function compareIt(password, hashedPassword){
 
 module.exports = {
     Mutation: {
-        upsertUser: async (root, args, ctx) => {
-            // hashIt(password);
-            // compareIt(password);
+        upsertUser: async (root, args, context) => {
             const userInput = {}
             userInput.firstName = args.input.firstName
             userInput.lastName = args.input.lastName
@@ -36,7 +34,7 @@ module.exports = {
                 const query = {email: userInput.email}
                 const updateQuery = {$set: userInput}
                 const options = { upsert: true };
-                await Users.updateOne(query, updateQuery, options, function (error, result) {
+                await context.Users.updateOne(query, updateQuery, options, function (error, result) {
                     if (error) {
                         console.error(error)
                         return error
@@ -48,7 +46,7 @@ module.exports = {
                                 // Query by newly inserted ID
                                 query = {_id: result.upsertedId._id}
                             } else {
-                                console.error("Upserted a new user but no ID returned by Mongo.")
+                                console.error("Upserted new user but no ID returned by Mongo.")
                             }
                         } else {
                             // Existing user was UPDATED
@@ -56,7 +54,7 @@ module.exports = {
                             query = {email: userInput.email}
                         }
                         // Query the new or updated user document to return
-                        Users.findOne(query, {}, function(error,result) {
+                        context.Users.findOne(query, {}, function(error,result) {
                             if(error) {
                                 console.error(error)
                                 return error
@@ -74,9 +72,9 @@ module.exports = {
                 return e
             }
         },
-        processGoogleAuth: async (root, args, ctx) => {
+        processGoogleAuth: async (root, args, context) => {
             const token = args.input.token
-            const session = ctx.session
+            const session = context.session
             const googleResult = await processGoogleToken(token)
             const tempUserResult = {}
             //tempUserResult._id = "BS_ID"
@@ -86,19 +84,18 @@ module.exports = {
             tempUserResult.email = googleResult.email
             tempUserResult.authType = "GOOGLE"
             session.user = tempUserResult
-
             //password: String
-
-            // TODO handle upsert into DB
+            // TODO cleanup upsert
             try {
                 const query = {email: tempUserResult.email}
                 const updateQuery = {$set: tempUserResult}
                 const options = { upsert: true };
-                const res = await Users.updateOne(query, updateQuery, options)
+                const res = await context.Users.updateOne(query, updateQuery, options)
                 //const cleanResult = prepare(res.ops[0])
                 console.log(res.upsertedId)
                 const upsertResult = {
-                    _id:"FAKEID",
+                    // TODO get new or updated user _id and return!!!
+                    _id:"TODO",
                     firstName:tempUserResult.firstName,
                     lastName:tempUserResult.lastName,
                     email:tempUserResult.email,
@@ -112,7 +109,7 @@ module.exports = {
             }
             //return tempUserResult
         },
-        createOption: async (root, args) => {
+        createOption: async (root, args, context) => {
             const inputData = args.input
             // TODO Validate current user....
             // generate ObjectIds for Option, Spread(s) and Leg(s)
@@ -130,23 +127,49 @@ module.exports = {
             thisLeg.initialAroi = calculateAroi({startDate:startDate,endDate:endDate,roi:initialRoi})
             thisLeg.capitalRequirement = capitalRequirement * 100
             try {
-                const res = await Options.insertOne(inputData)
+                const res = await context.Options.insertOne(inputData)
                 return prepare(res.ops[0])
             }
             catch (e) {
                 return e
             }
         },
-        createBanking: async (root, args) => {
+        createBanking: async (root, args, context) => {
             const inputData = args.input
             // TODO Validate current user....
             try {
-                const res = await Banking.insertOne(inputData)
+                const res = await context.Banking.insertOne(inputData)
                 return prepare(res.ops[0])
             }
             catch (e) {
                 return e
             }
+        },
+        createUnderlying: async (root, args, context) => {
+            const rawInputData = args.input
+            const finalInputData = {}
+            console.log(rawInputData)
+            const underlyingID = rawInputData._id != null ? rawInputData._id : new ObjectId
+            finalInputData._id = underlyingID
+            finalInputData.userId = rawInputData.userId
+            finalInputData.symbol = rawInputData.symbol
+            finalInputData.startDate = rawInputData.startDate
+            finalInputData.underlyingTrades = rawInputData.underlyingTrades
+            console.log(finalInputData)
+
+            // TODO build out everything:
+            // 1. Is there already an ACTIVE HISTORY for this SYMBOL?
+            // 2. Cost basis calculations!
+            // 3. Auto close a history / position when shares = 0
+            // 4. Errors with calculations (i.e. fewer than 0 shares!?), incorrect or incomplete input, etc.
+            // 5. UPSERT
+            const query = {_id: underlyingID}
+            const updateQuery = {$set: finalInputData}
+            const options = { upsert: true };
+            const res = await context.Underlying.updateOne(query, updateQuery, options)
+            console.log(res)
+            return prepare(finalInputData)
+
         },
     },
     Date: new GraphQLScalarType({

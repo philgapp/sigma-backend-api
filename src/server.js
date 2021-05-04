@@ -39,7 +39,7 @@ export const start = async () => {
 
         const corsOptions = {
             credentials: true,
-            origin: "http://localhost:3000",
+            origin: process.env.FRONTEND_URL,
         };
         app.use(cors(corsOptions))
 
@@ -55,19 +55,19 @@ export const start = async () => {
 
         app.use(session({
             secret: process.env.STORE_SECRET,
-            name: "SOTASID_DEV",
+            name: process.env.COOKIE_NAME,
             cookie: {
                 maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-                sameSite: false, // this may need to be false is you are accessing from another React app
+                sameSite: false, // this may need to be false if you are accessing from another app
                 httpOnly: true, // this must be false if you want to access the cookie
-                secure: false
+                secure: false //TODO true for HTTPS later...
             },
             store: store,
             // Boilerplate options, see:
             // * https://www.npmjs.com/package/express-session#resave
             // * https://www.npmjs.com/package/express-session#saveuninitialized
-            resave: true,
-            saveUninitialized: true,
+            resave: false,
+            saveUninitialized: false,
             unset: 'destroy'
         }));
 
@@ -76,11 +76,7 @@ export const start = async () => {
             resolvers
         });
 
-        const root = {
-            sessionId: function (args, request) {
-                return request.session.id;
-            }
-        }
+        const root = {}
 
         app.use('/graphql',
             bodyParser.json(),
@@ -89,15 +85,13 @@ export const start = async () => {
                 rootValue: root,
                 context: {
                     req: req,
+                    session: req.session,
                     Users: db.collection('users'),
                     Sessions: db.collection('sessions'),
                     Dashboards: db.collection('dashboards'),
                     Options: db.collection('options'),
                     Underlying: db.collection('underlying'),
                     Banking: db.collection('banking'),
-                    UnderlyingHistories: db.collection('underlyinghistories'),
-                    UnderlyingTrades: db.collection('underlyingtrades'),
-
                 },
                 graphiql: true,
             })));

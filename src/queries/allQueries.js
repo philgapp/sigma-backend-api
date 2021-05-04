@@ -36,6 +36,9 @@ module.exports = {
         },
         getSession: (root, args, context) => {
             const session = context.req.session
+            if(session && !session.user) {
+                session.user = {saveNewSession:true}
+            }
             const sessionId = session.id ? session.id : null
             if (sessionId == null) {
                 return ""
@@ -45,7 +48,8 @@ module.exports = {
         },
         getSessionUser: async (root, args, context) => {
             const sessionId = args.session
-            const sessionUser = context.req.session.user || null
+            if(!context.req.session.user) return
+            const sessionUser = context.req.session.user.saveNewSession ? null : context.req.session.user
             const dbSession = prepare(await context.Sessions.findOne({"_id": sessionId}))
             let result
             if (sessionUser == null) {
@@ -64,7 +68,7 @@ module.exports = {
             return result
         },
         login: async (root, args, ctx) => {
-            const dbUser = prepare(await Users.findOne({"email": args.input.username}))
+            const dbUser = prepare(await ctx.Users.findOne({"email": args.input.username}))
             if (dbUser) {
                 const hashedPassword = dbUser.password
                 const password = await compareIt(args.input.password, hashedPassword)
@@ -93,10 +97,11 @@ module.exports = {
             if (args.session == ctx.session.id) {
                 console.log("destroying session " + args.session)
                 ctx.session.destroy(error => {
-                    //console.log(error)
                     if (error) {
+                        console.error(error)
                         result = "Error destroying session."
                     } else {
+                        ctx.session = null
                         result = "Session destroyed."
                     }
                 })
@@ -229,7 +234,6 @@ module.exports = {
         getUnderlying: async (root, args, ctx) => {
             const userId = args.input.userId
             let query = {userId: {$eq: userId}}
-            /*
             if (args.input.open) {
                 query = {
                     $and: [
@@ -238,29 +242,8 @@ module.exports = {
                     ]
                 }
             }
-
-
-            type UnderlyingHistory {
-                _id: ID
-                userId: ID
-                symbol: String
-                startDate: Date
-                endDate: Date
-                underlyingTrades: [UnderlyingTrade]
-              }
-              type UnderlyingTrade {
-                _id: ID
-                userId: ID
-                type: UnderlyingTradeType
-                date: String
-                shares: String
-                price: String
-              }
-
-             */
-            const underlying = (await ctx.Underlying.find(query).toArray()).map(prepare)
-            console.log(res)
-            //return res
+            const res = (await ctx.Underlying.find(query).toArray()).map(prepare)
+            return res
         },
         getBanking: async (root, args, ctx) => {
             const userId = args.input.userId
