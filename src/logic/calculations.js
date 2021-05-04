@@ -46,6 +46,71 @@ const calculateAroi = (input) => {
     return aroi
 }
 
+// Dashboard functions
+// Open Options
+// input = array of open Options
+// collateral (For chart)
+// numberOpen: 8,
+// potentialProfit: 1500,
+// nextExpiry: 1621555200000
+const calculateOpenOptionsForDashboard = (input) => {
+    const openOptions = input.openOptions
+    let totalCollateral = 0
+    let potentialProfit = 0
+    let expirationDateArray = []
+    let nextExpiry
+    openOptions.map(option => {
+        // Separate simple options and spreads
+        // TODO smarter checking using:
+        // isSpread (on legs)
+        // parent (NEEDS TO BE ADDED TO OPTION-SPREAD-LEG STILL!!!!!!)
+        // etc.
+        if(option.spreads.length > 1) {
+            // More than 1 spread?!? Most complex options....
+        } else {
+            // Single Spread
+            if(option.spreads[0].legs.length > 1) {
+                // Simple Spreads, medium complexity
+                console.log("Complex Option")
+            } else {
+                // Single Leg, simple options
+                const leg = option.spreads[0].legs[0]
+                totalCollateral += (leg.capitalRequirement)
+                potentialProfit += (leg.initialPremium * 100)
+                expirationDateArray.push(leg.expirationDate)
+            }
+        }
+    })
+    nextExpiry =  expirationDateArray.reduce(function (pre, cur) {
+        return Date.parse(pre) > Date.parse(cur) ? cur : pre;
+    });
+
+    const result = {}
+    result.collateral = totalCollateral
+    result.numberOpen = openOptions.length
+    result.potentialProfit = potentialProfit
+    result.nextExpiry = nextExpiry
+    return result
+}
+
+
+const calculateTotalBalance = (banking) => {
+    let balance = 0
+    banking.map(trans => {
+        if(trans.type == "Deposit") {
+            balance += trans.amount
+        }
+        else if(trans.type == "Withdrawal") {
+            balance -= trans.amount
+        }
+        else {
+            console.error("Banking transaction type " + trans.type + " could not be added to or subtracted from calculateTotalBalance.")
+        }
+    })
+    return balance
+}
+
+
 // Returns cost basis
 /*
 input = {
@@ -116,5 +181,7 @@ const generateTestId = function () {
 module.exports = {
     calculateRoi,
     calculateAroi,
-    generateTestId
+    generateTestId,
+    calculateOpenOptionsForDashboard,
+    calculateTotalBalance
 }
