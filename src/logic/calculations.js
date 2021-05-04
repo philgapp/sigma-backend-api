@@ -1,19 +1,44 @@
 // Returns ROI as percentage to 2 decimals given input.profit and input.capital
+/*
+input = {
+    profit: premium per share
+    capital: strike price (potential cost per share)
+}
+return = {
+    roi: direct profit / capital ROI multiplied by 100 (shares per option contract)
+}
+ */
 const calculateRoi = (input) => {
-    if(!input) return
+    if(!input) {
+        console.error("calculateRoi no input!")
+        return
+    }
     const rawRoi = input.profit / input.capital
     const roi = (rawRoi * 100).toFixed(2)
     return roi
 }
 
 // Returns AROI as percentage to 2 decimals given input.roi, input.startDate and input.endDate
+/*
+input = {
+    startDate
+    endDate
+    roi: from calculateRoi function result
+}
+return = {
+    aroi: annualized return given a basic ROI and date range (number of days)
+}
+ */
 const calculateAroi = (input) => {
-    if(!input) return
+    if(!input) {
+        console.error("calculateAroi no input!")
+        return
+    }
     // Get full text string dates from numeric values
     const startDate = new Date(input.startDate)
     const endDate = new Date(input.endDate)
     // Calculate difference between dates in days
-    const days = endDate.getDate() - startDate.getDate()
+    const days = (endDate - startDate)/86400000
     // Calculate and return AROI as a float
     const rawDailyRoi = input.roi / days
     const rawAroi = rawDailyRoi * 365
@@ -21,8 +46,110 @@ const calculateAroi = (input) => {
     return aroi
 }
 
+// Dashboard functions
+// Open Options
+// input = array of open Options
+// collateral (For chart)
+// numberOpen: 8,
+// potentialProfit: 1500,
+// nextExpiry: 1621555200000
+const calculateOpenOptionsForDashboard = (input) => {
+    const openOptions = input.openOptions
+    let totalCollateral = 0
+    let potentialProfit = 0
+    let expirationDateArray = []
+    let nextExpiry
+    openOptions.map(option => {
+        // Separate simple options and spreads
+        // TODO smarter checking using:
+        // isSpread (on legs)
+        // parent (NEEDS TO BE ADDED TO OPTION-SPREAD-LEG STILL!!!!!!)
+        // etc.
+        if(option.spreads.length > 1) {
+            // More than 1 spread?!? Most complex options....
+        } else {
+            // Single Spread
+            if(option.spreads[0].legs.length > 1) {
+                // Simple Spreads, medium complexity
+                console.log("Complex Option")
+            } else {
+                // Single Leg, simple options
+                const leg = option.spreads[0].legs[0]
+                totalCollateral += (leg.capitalRequirement)
+                potentialProfit += (leg.initialPremium * 100)
+                expirationDateArray.push(leg.expirationDate)
+            }
+        }
+    })
+    nextExpiry =  expirationDateArray.reduce(function (pre, cur) {
+        return Date.parse(pre) > Date.parse(cur) ? cur : pre;
+    });
+
+    const result = {}
+    result.collateral = totalCollateral
+    result.numberOpen = openOptions.length
+    result.potentialProfit = potentialProfit
+    result.nextExpiry = nextExpiry
+    return result
+}
+
+
+const calculateTotalBalance = (banking) => {
+    let balance = 0
+    banking.map(trans => {
+        if(trans.type == "Deposit") {
+            balance += trans.amount
+        }
+        else if(trans.type == "Withdrawal") {
+            balance -= trans.amount
+        }
+        else {
+            console.error("Banking transaction type " + trans.type + " could not be added to or subtracted from calculateTotalBalance.")
+        }
+    })
+    return balance
+}
+
+
+// Returns cost basis
+/*
+input = {
+    type: simple, timeFrame, or allTime: used to determine data to use for calculation
+    underlyingData
+    optionData
+}
+returns = {
+    basicBasis: (highest) cost basis of purchases / assignments without any reductions
+    premiumAdjustedBasis: (common adjusted) cost basis with reductions due to any premium collected
+    finalAdjustedBasis: (lowest) cost basis with reductions from premium and dividends
+}
+ */
+const calculateCostBasis = (input) => {
+    // TODO - handle timeframes, campaigns that include open and closed positions, all time, etc.
+}
+
 // Returns price target to 2 decimals given
+/*
+input = {
+    basicBasis: basic, unadjusted cost basis
+    startDate: earliest date for current campaign
+}
+ */
 const calculatePriceTarget = (input) => {
+
+}
+
+// Returns total booked income for time period
+/*
+input = {
+    startDate: optional (all time if not provided)
+    endDate: optional (all time if not provided)
+    type: all, option or underlying
+    data: array of option or underlying data to calculate
+    allData: array with 2 arrays for option AND underlying data
+}
+ */
+const calculateBookedIncome = (input) => {
 
 }
 
@@ -54,5 +181,7 @@ const generateTestId = function () {
 module.exports = {
     calculateRoi,
     calculateAroi,
-    generateTestId
+    generateTestId,
+    calculateOpenOptionsForDashboard,
+    calculateTotalBalance
 }
