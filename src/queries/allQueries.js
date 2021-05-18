@@ -233,7 +233,7 @@ module.exports = {
         },
         getUnderlying: async (root, args, ctx) => {
             const userId = args.input.userId
-            let query = {userId: {$eq: userId}}
+            let query = { userId: { $eq: userId } }
             if (args.input.open) {
                 query = {
                     $and: [

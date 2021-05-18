@@ -55,10 +55,13 @@ module.exports = `
       type Underlying {
         _id: ID
         userId: ID
+        symbol: String
+        currentShares: Float
         rawCostBasis: Float
         adjustedCostBasis: Float
         minimumCostBasis: Float
-        symbol: String
+        targetPriceWeek: Float
+        targetPriceMonth: Float
         startDate: Date
         endDate: Date
         underlyingTrades: [UnderlyingTrade]

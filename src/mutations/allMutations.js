@@ -1,6 +1,6 @@
 import {processGoogleToken} from "../logic/googleAuth";
 import {ObjectId} from "mongodb";
-import {calculateAroi, calculateRoi} from "../logic/calculations";
+import {calculateAroi, calculateCostBasisandShares, calculatePriceTarget, calculateRoi} from "../logic/calculations";
 import {prepare} from "../logic/util";
 import {GraphQLScalarType} from "graphql";
 import {Kind} from "graphql/language";
@@ -148,27 +148,86 @@ module.exports = {
         createUnderlying: async (root, args, context) => {
             const rawInputData = args.input
             const finalInputData = {}
-            console.log(rawInputData)
-            const underlyingID = rawInputData._id != null ? rawInputData._id : new ObjectId
-            finalInputData._id = underlyingID
-            finalInputData.userId = rawInputData.userId
-            finalInputData.symbol = rawInputData.symbol
-            finalInputData.startDate = rawInputData.startDate
-            finalInputData.underlyingTrades = rawInputData.underlyingTrades
-            console.log(finalInputData)
+            const allTrades = rawInputData.underlyingTrades
+            const newTrade = rawInputData.underlyingTrades[0]
 
-            // TODO build out everything:
-            // 1. Is there already an ACTIVE HISTORY for this SYMBOL?
-            // 2. Cost basis calculations!
-            // 3. Auto close a history / position when shares = 0
-            // 4. Errors with calculations (i.e. fewer than 0 shares!?), incorrect or incomplete input, etc.
-            // 5. UPSERT
-            const query = {_id: underlyingID}
-            const updateQuery = {$set: finalInputData}
-            const options = { upsert: true };
+            // If ID was provided from front-end use it to prevent duplication, otherwise create new ID
+            const underlyingID = rawInputData._id != null ? ObjectId(rawInputData._id) : new ObjectId
+            //console.log("underlyingID")
+            //console.log(underlyingID)
+
+            let existingTrade = false
+            let startDate
+            let updateQuery
+            let options = { upsert: true };
+
+            // 1. Is there already an ACTIVE HISTORY for this SYMBOL, USER, and (OR?) ID?
+            const existing = await context.Underlying.findOne({ symbol: rawInputData.symbol, userId: rawInputData.userId, endDate: null } )
+
+            // YES - only add new trade to underlyingTrades array!
+            if(existing && typeof(existing) != "undefined") {
+                existing.underlyingTrades.map(trade => {
+                    allTrades.push(trade)
+                })
+                existingTrade = true
+                startDate = existing.startDate
+                options = { upsert: false };
+                finalInputData._id = existing._id
+                // TODO of course
+                // 2. Auto close a history / position when shares = 0
+
+            // NO - add totally new Underlying position entry
+            } else {
+                finalInputData._id = new ObjectId
+                finalInputData.userId = rawInputData.userId
+                finalInputData.symbol = rawInputData.symbol
+                finalInputData.startDate = rawInputData.startDate
+                startDate = rawInputData.startDate
+                finalInputData.underlyingTrades = rawInputData.underlyingTrades
+            }
+
+            // TODO - finish, later add various cost basis methods (user preference item?) AND tranches (allow sales to be taken from specific past orders - i.e. FIFO, LILO, etc.):
+            // 3. Cost basis calculations
+            const costBasis = calculateCostBasisandShares({ underlyingTrades: allTrades } )
+            finalInputData.currentShares = costBasis.currentShares
+            finalInputData.rawCostBasis = costBasis.rawCostBasis
+            finalInputData.adjustedCostBasis = costBasis.adjustedCostBasis
+            finalInputData.minimumCostBasis = costBasis.minimumCostBasis
+
+            // TODO
+            // 4. Target Prices
+            const targetPriceData = calculatePriceTarget({ rawCostBasis: finalInputData.rawCostBasis, startDate: startDate } )
+            finalInputData.targetPriceWeek = targetPriceData.targetPriceWeek
+            finalInputData.targetPriceMonth = targetPriceData.targetPriceMonth
+
+            // TODO
+            // 5. Errors [with calculations (i.e. fewer than 0 shares!?)] - incorrect or incomplete input, etc.
+
+            // 6. UPSERT
+            let query = { _id: finalInputData._id }
+            updateQuery = existingTrade
+                ? { $push: {
+                        underlyingTrades: newTrade
+                    },
+                    $set: {
+                        currentShares: finalInputData.currentShares,
+                        rawCostBasis: finalInputData.rawCostBasis,
+                        //TODO any other fields that must be upserted for existing positions!
+                        targetPriceWeek: finalInputData.targetPriceWeek,
+                        targetPriceMonth: finalInputData.targetPriceMonth,
+                    }
+                    }
+                : { $set: finalInputData }
             const res = await context.Underlying.updateOne(query, updateQuery, options)
-            console.log(res)
-            return prepare(finalInputData)
+            let returnDocument = {}
+            if (res.upsertedId) {
+                returnDocument = (await context.Underlying.findOne({ _id: res.upsertedId._id } ))
+            } else {
+                returnDocument = (await context.Underlying.findOne({ _id: finalInputData._id } ))
+            }
+
+            // TODO return properly...
+            return returnDocument
 
         },
     },

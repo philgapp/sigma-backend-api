@@ -114,29 +114,116 @@ const calculateTotalBalance = (banking) => {
 // Returns cost basis
 /*
 input = {
-    type: simple, timeFrame, or allTime: used to determine data to use for calculation
-    underlyingData
+    underlyingTrades
     optionData
 }
 returns = {
-    basicBasis: (highest) cost basis of purchases / assignments without any reductions
-    premiumAdjustedBasis: (common adjusted) cost basis with reductions due to any premium collected
-    finalAdjustedBasis: (lowest) cost basis with reductions from premium and dividends
+    rawCostBasis: (highest) cost basis of purchases / assignments without any reductions
+    adjustedCostBasis: (common adjusted) cost basis with reductions due to any premium collected
+    minimumCostBasis: (lowest) cost basis with reductions from premium AND dividends
 }
  */
-const calculateCostBasis = (input) => {
+const calculateCostBasisandShares = (input) => {
+    //console.log("calc Cost Basis")
+    //console.log(input)
+
+    const underlyingTrades = input.underlyingTrades
+    let averageCostBasisData = {
+        totalSharesEverPurchased: 0,
+        totalCostOfAllShares: 0,
+        currentShares: 0,
+        rawCostBasis: 0,
+        totalDividends: 0,
+    }
+
+    const tradeReducer = (data, nextTrade) => {
+        //console.log("tradeReducer")
+        //console.log(data)
+        //console.log(nextTrade)
+        switch(nextTrade.type) {
+            case "Buy":
+                return {
+                    ...data,
+                    totalSharesEverPurchased: data.totalSharesEverPurchased += nextTrade.shares,
+                    totalCostOfAllShares: data.totalCostOfAllShares += parseFloat(nextTrade.price * nextTrade.shares),
+                    currentShares: data.currentShares += nextTrade.shares
+                }
+            case "Assigned":
+                return {
+                    ...data,
+                    totalSharesEverPurchased: data.totalSharesEverPurchased += nextTrade.shares,
+                    currentShares: data.currentShares += nextTrade.shares
+                }
+            case "Sell":
+                return {
+                    ...data,
+                    currentShares: data.currentShares -= nextTrade.shares
+                    // TODO FIFO, AVG cost basis, etc dealing with SELLS
+                }
+            case "Called":
+                return {
+                    ...data,
+                    currentShares: data.currentShares -= nextTrade.shares
+                    // TODO FIFO, AVG cost basis, etc dealing with CALLS
+                }
+            case "Dividend":
+                return {
+                    ...data,
+                    totalDividends: data.totalDividends += parseFloat(nextTrade.price * nextTrade.shares)
+                    // TODO FIFO, AVG cost basis, etc dealing with DIVS
+                }
+            default:
+                return data
+        }
+    }
+
+    const averageCostBasis = (data) => {
+        return Math.round((data.totalCostOfAllShares / data.totalSharesEverPurchased) * 100) / 100
+    }
+
+    underlyingTrades.map(trade => {
+        averageCostBasisData = tradeReducer(averageCostBasisData, trade)
+    })
+
+    averageCostBasisData.rawCostBasis = averageCostBasis(averageCostBasisData)
+    //console.log(averageCostBasisData)
+
+    return averageCostBasisData
+
     // TODO - handle timeframes, campaigns that include open and closed positions, all time, etc.
 }
 
 // Returns price target to 2 decimals given
 /*
 input = {
-    basicBasis: basic, unadjusted cost basis
+    rawCostBasis: basic, unadjusted cost basis
     startDate: earliest date for current campaign
+    targetReturn: user preferred AROI target (default 25%)
+}
+return = {
+    targetPriceWeek: target price to achieve return within next 7 days
+    targetPriceMonth: same, but for 30 days out
 }
  */
 const calculatePriceTarget = (input) => {
+    const costBasis = input.rawCostBasis
+    const startDate = new Date(input.startDate)
+    const targetReturn = input.targetReturn || 0.25
+    const targetAroi = (targetReturn/365)
+    const today1 = new Date()
+    const today2 = new Date()
+    const oneWeekTargetDate = today1.setDate(today1.getDate() + 7)
+    const oneMonthTargetDate = today2.setDate(today2.getDate() + 30)
+    const daysToOneWeek = (oneWeekTargetDate - startDate)/86400000
+    const daysToOneMonth = (oneMonthTargetDate - startDate)/86400000
 
+    const calculateTargets = () => {
+        return {
+            targetPriceWeek: Math.round( ( ( ( targetAroi * daysToOneWeek ) * costBasis ) + costBasis ) * 100 ) / 100,
+            targetPriceMonth: Math.round( ( ( ( targetAroi * daysToOneMonth ) * costBasis ) + costBasis ) * 100 ) / 100,
+        }
+    }
+    return calculateTargets()
 }
 
 // Returns total booked income for time period
@@ -183,5 +270,7 @@ module.exports = {
     calculateAroi,
     generateTestId,
     calculateOpenOptionsForDashboard,
-    calculateTotalBalance
+    calculateTotalBalance,
+    calculateCostBasisandShares,
+    calculatePriceTarget
 }
