@@ -50,7 +50,7 @@ module.exports = {
             const sessionId = args.session
             if(!context.req.session.user) return
             const sessionUser = context.req.session.user.saveNewSession ? null : context.req.session.user
-            const dbSession = prepare(await context.Sessions.findOne({"_id": sessionId}))
+            const dbSession = prepare(await context.Sessions.findOne({ _id: sessionId }))
             let result
             if (sessionUser == null) {
                 result = {
@@ -61,14 +61,14 @@ module.exports = {
                     authType: null
                 }
             } else {
-                const dbUser = prepare(await context.Users.findOne({"email": dbSession.session.user.email}))
+                const dbUser = prepare(await context.Users.findOne({ email: dbSession.session.user.email }))
                 context.req.session.user._id = ObjectId(dbUser._id)
                 result = sessionUser
             }
             return result
         },
         login: async (root, args, ctx) => {
-            const dbUser = prepare(await ctx.Users.findOne({"email": args.input.username}))
+            const dbUser = prepare(await ctx.Users.findOne({ email: args.input.username }))
             if (dbUser) {
                 const hashedPassword = dbUser.password
                 const password = await compareIt(args.input.password, hashedPassword)

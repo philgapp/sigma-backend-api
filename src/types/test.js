@@ -111,10 +111,10 @@ module.exports = `
       }
       input UserInput {
         _id: ID
-        firstName: String
-        lastName: String
-        email: String
-        authType: AuthType
+        firstName: String!
+        lastName: String!
+        email: String!
+        authType: AuthType!
         password: String
       }
       input BankingInput {
@@ -133,8 +133,8 @@ module.exports = `
       }
       scalar Date
       enum AuthType {
-        LOCAL
-        GOOGLE
+        Local
+        Google
       }
       enum OptionType {
         P
@@ -145,8 +145,8 @@ module.exports = `
         BECS
       }
       enum DirectionType {
-        BUY
-        SELL
+        Buy
+        Sell
       }
       enum UnderlyingTradeType {
         Buy

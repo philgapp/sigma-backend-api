@@ -31,11 +31,12 @@ module.exports = {
             userInput.authType = args.input.authType
             userInput.password = await hashIt(args.input.password);
             try {
-                const query = {email: userInput.email}
-                const updateQuery = {$set: userInput}
+                const query = { email: userInput.email }
+                const updateQuery = { $set: userInput }
                 const options = { upsert: true };
                 await context.Users.updateOne(query, updateQuery, options, function (error, result) {
                     if (error) {
+                        console.log('error upserting user')
                         console.error(error)
                         return error
                     } else {
@@ -44,14 +45,14 @@ module.exports = {
                             // New user was INSERTED
                             if(result.upsertedId._id) {
                                 // Query by newly inserted ID
-                                query = {_id: result.upsertedId._id}
+                                query = { _id: result.upsertedId._id }
                             } else {
                                 console.error("Upserted new user but no ID returned by Mongo.")
                             }
                         } else {
                             // Existing user was UPDATED
                             // Query by email (possibly updated)
-                            query = {email: userInput.email}
+                            query = { email: userInput.email }
                         }
                         // Query the new or updated user document to return
                         context.Users.findOne(query, {}, function(error,result) {
@@ -82,26 +83,33 @@ module.exports = {
             tempUserResult.firstName = nameArray[0]
             tempUserResult.lastName = nameArray[1]
             tempUserResult.email = googleResult.email
-            tempUserResult.authType = "GOOGLE"
+            tempUserResult.authType = "Google"
             session.user = tempUserResult
             //password: String
             // TODO cleanup upsert
             try {
-                const query = {email: tempUserResult.email}
-                const updateQuery = {$set: tempUserResult}
+                const query = { email: tempUserResult.email }
+                const updateQuery = { $set: tempUserResult }
                 const options = { upsert: true };
                 const res = await context.Users.updateOne(query, updateQuery, options)
                 //const cleanResult = prepare(res.ops[0])
-                console.log(res.upsertedId)
+                let returnDocument = {}
+                if (res.upsertedId) {
+                    returnDocument = (await context.Users.findOne({ _id: res.upsertedId._id } ))
+                } else {
+                    returnDocument = (await context.Users.findOne({ email: tempUserResult.email } ))
+                }
+                /*
                 const upsertResult = {
                     // TODO get new or updated user _id and return!!!
-                    _id:"TODO",
-                    firstName:tempUserResult.firstName,
-                    lastName:tempUserResult.lastName,
-                    email:tempUserResult.email,
-                    authType:tempUserResult.authType
+                    _id: "TODO",
+                    firstName: tempUserResult.firstName,
+                    lastName: tempUserResult.lastName,
+                    email: tempUserResult.email,
+                    authType: tempUserResult.authType
                 }
-                return upsertResult
+                 */
+                return returnDocument
             }
             catch (e) {
                 console.error(e)
