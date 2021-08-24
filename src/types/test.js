@@ -55,10 +55,13 @@ module.exports = `
       type Underlying {
         _id: ID
         userId: ID
+        symbol: String
+        currentShares: Float
         rawCostBasis: Float
         adjustedCostBasis: Float
         minimumCostBasis: Float
-        symbol: String
+        targetPriceWeek: Float
+        targetPriceMonth: Float
         startDate: Date
         endDate: Date
         underlyingTrades: [UnderlyingTrade]
@@ -93,7 +96,14 @@ module.exports = `
         endDate: Date
         underlyingTrades: [UnderlyingTradeInput]
       }
+      input EditUnderlyingInput {
+        _id: ID! 
+        userId: ID!
+        startDate: Date
+        underlyingTrades: UnderlyingTradeInput
+      }
       input UnderlyingTradeInput {
+        _id: ID
         type: UnderlyingTradeType
         tradeDate: Date
         shares: Float
@@ -108,10 +118,10 @@ module.exports = `
       }
       input UserInput {
         _id: ID
-        firstName: String
-        lastName: String
-        email: String
-        authType: AuthType
+        firstName: String!
+        lastName: String!
+        email: String!
+        authType: AuthType!
         password: String
       }
       input BankingInput {
@@ -127,11 +137,12 @@ module.exports = `
         createBanking(input: BankingInput!): Banking
         createUnderlying(input: UnderlyingInput!): Underlying
         createUnderlyingTrade(input: UnderlyingTradeInput!): Underlying
+        editUnderlying( input: EditUnderlyingInput! ): Underlying
       }
       scalar Date
       enum AuthType {
-        LOCAL
-        GOOGLE
+        Local
+        Google
       }
       enum OptionType {
         P
@@ -142,8 +153,8 @@ module.exports = `
         BECS
       }
       enum DirectionType {
-        BUY
-        SELL
+        Buy
+        Sell
       }
       enum UnderlyingTradeType {
         Buy

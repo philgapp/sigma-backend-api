@@ -1,29 +1,27 @@
-import {processGoogleToken} from "../logic/googleAuth";
-import {ObjectId} from "mongodb";
-import {calculateAroi, calculateRoi} from "../logic/calculations";
-import {prepare} from "../logic/util";
-import {GraphQLScalarType} from "graphql";
-import {Kind} from "graphql/language";
+import { processGoogleToken } from "../logic/googleAuth";
+import { ObjectId } from "mongodb";
+import { calculateAroi, calculateCostBasisandShares, calculatePriceTarget, calculateRoi } from "../logic/calculations";
+import { prepare } from "../logic/util";
+import { GraphQLScalarType } from "graphql";
+import { Kind } from "graphql/language";
 const bcrypt = require('bcrypt');
-// Password hash functions
-// Hash a new password
-async function hashIt(password){
-    const salt = await bcrypt.genSalt(6);
-    const hashed = await bcrypt.hash(password, salt);
-    return hashed
-}
-
-// Compare input password with hashed password
-async function compareIt(password, hashedPassword){
-    const validPassword = await bcrypt.compare(password, hashedPassword);
-    return validPassword
-}
-// hashIt(password);
-// compareIt(password);
+    // Password hash functions
+    // Hash a new password
+    async function hashIt( password ) {
+        const salt = await bcrypt.genSalt(6)
+        const hashed = await bcrypt.hash( password, salt )
+        return hashed }
+    // Compare input password with hashed password
+    async function compareIt( password, hashedPassword ) {
+        const validPassword = await bcrypt.compare( password, hashedPassword );
+        return validPassword }
+    // Usage:
+    // hashIt( password )
+    // compareIt( password, storedPassword )
 
 module.exports = {
     Mutation: {
-        upsertUser: async (root, args, context) => {
+        upsertUser: async ( root, args, context ) => {
             const userInput = {}
             userInput.firstName = args.input.firstName
             userInput.lastName = args.input.lastName
@@ -31,11 +29,12 @@ module.exports = {
             userInput.authType = args.input.authType
             userInput.password = await hashIt(args.input.password);
             try {
-                const query = {email: userInput.email}
-                const updateQuery = {$set: userInput}
+                const query = { email: userInput.email }
+                const updateQuery = { $set: userInput }
                 const options = { upsert: true };
                 await context.Users.updateOne(query, updateQuery, options, function (error, result) {
                     if (error) {
+                        console.log('error upserting user')
                         console.error(error)
                         return error
                     } else {
@@ -44,14 +43,14 @@ module.exports = {
                             // New user was INSERTED
                             if(result.upsertedId._id) {
                                 // Query by newly inserted ID
-                                query = {_id: result.upsertedId._id}
+                                query = { _id: result.upsertedId._id }
                             } else {
                                 console.error("Upserted new user but no ID returned by Mongo.")
                             }
                         } else {
                             // Existing user was UPDATED
                             // Query by email (possibly updated)
-                            query = {email: userInput.email}
+                            query = { email: userInput.email }
                         }
                         // Query the new or updated user document to return
                         context.Users.findOne(query, {}, function(error,result) {
@@ -82,26 +81,33 @@ module.exports = {
             tempUserResult.firstName = nameArray[0]
             tempUserResult.lastName = nameArray[1]
             tempUserResult.email = googleResult.email
-            tempUserResult.authType = "GOOGLE"
+            tempUserResult.authType = "Google"
             session.user = tempUserResult
             //password: String
             // TODO cleanup upsert
             try {
-                const query = {email: tempUserResult.email}
-                const updateQuery = {$set: tempUserResult}
+                const query = { email: tempUserResult.email }
+                const updateQuery = { $set: tempUserResult }
                 const options = { upsert: true };
                 const res = await context.Users.updateOne(query, updateQuery, options)
                 //const cleanResult = prepare(res.ops[0])
-                console.log(res.upsertedId)
+                let returnDocument = {}
+                if (res.upsertedId) {
+                    returnDocument = (await context.Users.findOne({ _id: res.upsertedId._id } ))
+                } else {
+                    returnDocument = (await context.Users.findOne({ email: tempUserResult.email } ))
+                }
+                /*
                 const upsertResult = {
                     // TODO get new or updated user _id and return!!!
-                    _id:"TODO",
-                    firstName:tempUserResult.firstName,
-                    lastName:tempUserResult.lastName,
-                    email:tempUserResult.email,
-                    authType:tempUserResult.authType
+                    _id: "TODO",
+                    firstName: tempUserResult.firstName,
+                    lastName: tempUserResult.lastName,
+                    email: tempUserResult.email,
+                    authType: tempUserResult.authType
                 }
-                return upsertResult
+                 */
+                return returnDocument
             }
             catch (e) {
                 console.error(e)
@@ -145,47 +151,180 @@ module.exports = {
                 return e
             }
         },
-        createUnderlying: async (root, args, context) => {
+        createUnderlying: async ( root, args, context ) => {
             const rawInputData = args.input
             const finalInputData = {}
-            console.log(rawInputData)
-            const underlyingID = rawInputData._id != null ? rawInputData._id : new ObjectId
-            finalInputData._id = underlyingID
-            finalInputData.userId = rawInputData.userId
-            finalInputData.symbol = rawInputData.symbol
-            finalInputData.startDate = rawInputData.startDate
-            finalInputData.underlyingTrades = rawInputData.underlyingTrades
-            console.log(finalInputData)
+            const allTrades = rawInputData.underlyingTrades
+            const newTrade = rawInputData.underlyingTrades[0]
+            newTrade._id = new ObjectId
 
-            // TODO build out everything:
-            // 1. Is there already an ACTIVE HISTORY for this SYMBOL?
-            // 2. Cost basis calculations!
-            // 3. Auto close a history / position when shares = 0
-            // 4. Errors with calculations (i.e. fewer than 0 shares!?), incorrect or incomplete input, etc.
-            // 5. UPSERT
-            const query = {_id: underlyingID}
-            const updateQuery = {$set: finalInputData}
-            const options = { upsert: true };
-            const res = await context.Underlying.updateOne(query, updateQuery, options)
-            console.log(res)
-            return prepare(finalInputData)
+            // If ID was provided from front-end use it to prevent duplication, otherwise create new ID
+            const underlyingID = rawInputData._id != null ? ObjectId( rawInputData._id ) : new ObjectId
+            //console.log("underlyingID")
+            //console.log(underlyingID)
 
+            let existingPosition = false
+            let startDate
+            let updateQuery
+            let options = { upsert: true }
+
+            // 1. Is there already an ACTIVE HISTORY for this SYMBOL, USER, and (OR?) ID?
+            const existing = await context.Underlying
+                .findOne( {
+                    symbol: rawInputData.symbol,
+                    userId: rawInputData.userId,
+                    endDate: null } )
+
+            // YES - only add new trade to underlyingTrades array!
+            if( existing && typeof( existing ) !== "undefined" ) {
+                existing.underlyingTrades
+                    .map( trade => {
+                        allTrades.push( trade ) } )
+                existingPosition = true
+                startDate = existing.startDate
+                options = { upsert: false }
+                finalInputData._id = existing._id
+                // TODO of course !!!
+                // 2. Auto close a history / position when shares = 0
+
+            // NO - add totally new Underlying position entry
+            } else {
+                finalInputData._id = new ObjectId
+                finalInputData.userId = rawInputData.userId
+                finalInputData.symbol = rawInputData.symbol
+                finalInputData.startDate = rawInputData.startDate
+                startDate = rawInputData.startDate
+                finalInputData.underlyingTrades = rawInputData.underlyingTrades
+            }
+
+            // TODO - finish, later add various cost basis methods (user preference item?) AND tranches (allow sales to be taken from specific past orders - i.e. FIFO, LILO, etc.):
+            // 3. Cost basis calculations
+            const costBasisData = calculateCostBasisandShares({ underlyingTrades: allTrades } )
+            finalInputData.currentShares = costBasisData.currentShares
+            finalInputData.rawCostBasis = costBasisData.rawCostBasis
+            finalInputData.adjustedCostBasis = costBasisData.adjustedCostBasis
+            finalInputData.minimumCostBasis = costBasisData.minimumCostBasis
+
+            // TODO
+            // 4. Target Prices
+            const targetPriceData = calculatePriceTarget({ rawCostBasis: finalInputData.rawCostBasis, startDate: startDate } )
+            finalInputData.targetPriceWeek = targetPriceData.targetPriceWeek
+            finalInputData.targetPriceMonth = targetPriceData.targetPriceMonth
+
+            // TODO
+            // 5. Errors [with calculations (i.e. fewer than 0 shares!?)] - incorrect or incomplete input, etc.
+
+            // 6. UPSERT
+            let query = { _id: finalInputData._id }
+            updateQuery = existingPosition
+                ? { $push: {
+                        underlyingTrades: newTrade },
+                    $set: {
+                        currentShares: finalInputData.currentShares,
+                        rawCostBasis: finalInputData.rawCostBasis,
+                        //TODO any other fields that must be upserted for existing positions!
+                        targetPriceWeek: finalInputData.targetPriceWeek,
+                        targetPriceMonth: finalInputData.targetPriceMonth, } }
+                : { $set: finalInputData }
+            const res = await context.Underlying
+                .updateOne( query, updateQuery, options )
+            let returnDocument = {}
+            if ( res.upsertedId ) {
+                returnDocument = ( await context.Underlying
+                    .findOne( { _id: res.upsertedId._id } ) )
+            } else {
+                returnDocument = ( await context.Underlying
+                    .findOne({  _id: finalInputData._id } ) )
+            }
+
+            // TODO return properly...
+            return returnDocument
+        },
+        editUnderlying: async ( root, args, context ) => {
+            const rawInputData = args.input
+            const finalInputData = {
+                _id: rawInputData._id,
+                userId: rawInputData.userId,
+                startDate: rawInputData.startDate,
+                underlyingTrades: {
+                    _id: rawInputData.underlyingTrades._id,
+                    type: rawInputData.underlyingTrades.type,
+                    tradeDate: rawInputData.underlyingTrades.tradeDate,
+                    shares: rawInputData.underlyingTrades.shares,
+                    price: rawInputData.underlyingTrades.price,
+                }
+            }
+            console.log( rawInputData )
+            console.log( finalInputData )
+
+            const allTrades = []
+            const startDate = rawInputData.startDate
+            const options = { upsert: false }
+
+            const position = await context.Underlying
+                .findOne( {
+                    symbol: rawInputData.symbol,
+                    userId: rawInputData.userId,
+                    endDate: null } )
+            if( position && typeof( position ) !== "undefined" ) {
+                position.underlyingTrades
+                    .map( trade => {
+                        allTrades.push( trade ) } )
+                //finalInputData._id = existing._id
+                // TODO of course !!!
+                // 2. Auto close a history / position when shares = 0
+            }
+
+            // TODO - finish, later add various cost basis methods (user preference item?) AND tranches (allow sales to be taken from specific past orders - i.e. FIFO, LILO, etc.):
+            // 3. Cost basis calculations
+            const costBasisData = calculateCostBasisandShares({ underlyingTrades: allTrades } )
+            finalInputData.currentShares = costBasisData.currentShares
+            finalInputData.rawCostBasis = costBasisData.rawCostBasis
+            finalInputData.adjustedCostBasis = costBasisData.adjustedCostBasis
+            finalInputData.minimumCostBasis = costBasisData.minimumCostBasis
+
+            // TODO
+            // 4. Target Prices
+            const targetPriceData = calculatePriceTarget({ rawCostBasis: finalInputData.rawCostBasis, startDate: startDate } )
+            finalInputData.targetPriceWeek = targetPriceData.targetPriceWeek
+            finalInputData.targetPriceMonth = targetPriceData.targetPriceMonth
+
+            const query = { _id: finalInputData._id }
+            const updateQuery = {
+                $set: {
+                    underlyingTrades: newTrade,
+
+                    currentShares: finalInputData.currentShares,
+                    rawCostBasis: finalInputData.rawCostBasis,
+                    //TODO any other fields that must be upserted for existing positions!
+                    targetPriceWeek: finalInputData.targetPriceWeek,
+                    targetPriceMonth: finalInputData.targetPriceMonth, } }
+            const res = await context.Underlying
+                .updateOne( query, updateQuery, options )
+            let returnDocument = {}
+            if ( res.upsertedId ) {
+                returnDocument = ( await context.Underlying
+                    .findOne( { _id: res.upsertedId._id } ) )
+            } else {
+                returnDocument = ( await context.Underlying
+                    .findOne({  _id: finalInputData._id } ) )
+            }
+
+            // TODO return properly...
+            return returnDocument
         },
     },
     Date: new GraphQLScalarType({
         name: 'Date',
         description: 'Date custom scalar type',
-        parseValue(value) {
+        parseValue( value ) {
             return value; // value from the client
         },
-        serialize(value) {
-            return value; // value sent to the client
+        serialize( value ) {
+            return value // value sent to the client
         },
-        parseLiteral(ast) {
-            if (ast.kind === Kind.INT) {
-                return parseInt(ast.value, 10); // ast value is always in string format
-            }
-            return null;
-        },
-    }),
+        parseLiteral( ast) {
+            if ( ast.kind === Kind.INT ) return parseInt( ast.value, 10 ) // ast value is always in string format
+            return null
+        } } ),
 }
