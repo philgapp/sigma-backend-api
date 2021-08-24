@@ -96,7 +96,14 @@ module.exports = `
         endDate: Date
         underlyingTrades: [UnderlyingTradeInput]
       }
+      input EditUnderlyingInput {
+        _id: ID! 
+        userId: ID!
+        startDate: Date
+        underlyingTrades: UnderlyingTradeInput
+      }
       input UnderlyingTradeInput {
+        _id: ID
         type: UnderlyingTradeType
         tradeDate: Date
         shares: Float
@@ -130,6 +137,7 @@ module.exports = `
         createBanking(input: BankingInput!): Banking
         createUnderlying(input: UnderlyingInput!): Underlying
         createUnderlyingTrade(input: UnderlyingTradeInput!): Underlying
+        editUnderlying( input: EditUnderlyingInput! ): Underlying
       }
       scalar Date
       enum AuthType {

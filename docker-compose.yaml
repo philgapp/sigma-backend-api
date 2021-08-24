@@ -1,0 +1,11 @@
+version: '3.3'
+services:
+  sigma-backend:
+    build:
+      context: .
+    ports:
+      - "4000:4000"
+    networks:
+      - sigmanet
+networks:
+  sigmanet:

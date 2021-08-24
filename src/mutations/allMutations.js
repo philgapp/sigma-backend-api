@@ -1,29 +1,27 @@
-import {processGoogleToken} from "../logic/googleAuth";
-import {ObjectId} from "mongodb";
-import {calculateAroi, calculateCostBasisandShares, calculatePriceTarget, calculateRoi} from "../logic/calculations";
-import {prepare} from "../logic/util";
-import {GraphQLScalarType} from "graphql";
-import {Kind} from "graphql/language";
+import { processGoogleToken } from "../logic/googleAuth";
+import { ObjectId } from "mongodb";
+import { calculateAroi, calculateCostBasisandShares, calculatePriceTarget, calculateRoi } from "../logic/calculations";
+import { prepare } from "../logic/util";
+import { GraphQLScalarType } from "graphql";
+import { Kind } from "graphql/language";
 const bcrypt = require('bcrypt');
-// Password hash functions
-// Hash a new password
-async function hashIt(password){
-    const salt = await bcrypt.genSalt(6);
-    const hashed = await bcrypt.hash(password, salt);
-    return hashed
-}
-
-// Compare input password with hashed password
-async function compareIt(password, hashedPassword){
-    const validPassword = await bcrypt.compare(password, hashedPassword);
-    return validPassword
-}
-// hashIt(password);
-// compareIt(password);
+    // Password hash functions
+    // Hash a new password
+    async function hashIt( password ) {
+        const salt = await bcrypt.genSalt(6)
+        const hashed = await bcrypt.hash( password, salt )
+        return hashed }
+    // Compare input password with hashed password
+    async function compareIt( password, hashedPassword ) {
+        const validPassword = await bcrypt.compare( password, hashedPassword );
+        return validPassword }
+    // Usage:
+    // hashIt( password )
+    // compareIt( password, storedPassword )
 
 module.exports = {
     Mutation: {
-        upsertUser: async (root, args, context) => {
+        upsertUser: async ( root, args, context ) => {
             const userInput = {}
             userInput.firstName = args.input.firstName
             userInput.lastName = args.input.lastName
@@ -153,35 +151,40 @@ module.exports = {
                 return e
             }
         },
-        createUnderlying: async (root, args, context) => {
+        createUnderlying: async ( root, args, context ) => {
             const rawInputData = args.input
             const finalInputData = {}
             const allTrades = rawInputData.underlyingTrades
             const newTrade = rawInputData.underlyingTrades[0]
+            newTrade._id = new ObjectId
 
             // If ID was provided from front-end use it to prevent duplication, otherwise create new ID
-            const underlyingID = rawInputData._id != null ? ObjectId(rawInputData._id) : new ObjectId
+            const underlyingID = rawInputData._id != null ? ObjectId( rawInputData._id ) : new ObjectId
             //console.log("underlyingID")
             //console.log(underlyingID)
 
-            let existingTrade = false
+            let existingPosition = false
             let startDate
             let updateQuery
-            let options = { upsert: true };
+            let options = { upsert: true }
 
             // 1. Is there already an ACTIVE HISTORY for this SYMBOL, USER, and (OR?) ID?
-            const existing = await context.Underlying.findOne({ symbol: rawInputData.symbol, userId: rawInputData.userId, endDate: null } )
+            const existing = await context.Underlying
+                .findOne( {
+                    symbol: rawInputData.symbol,
+                    userId: rawInputData.userId,
+                    endDate: null } )
 
             // YES - only add new trade to underlyingTrades array!
-            if(existing && typeof(existing) != "undefined") {
-                existing.underlyingTrades.map(trade => {
-                    allTrades.push(trade)
-                })
-                existingTrade = true
+            if( existing && typeof( existing ) !== "undefined" ) {
+                existing.underlyingTrades
+                    .map( trade => {
+                        allTrades.push( trade ) } )
+                existingPosition = true
                 startDate = existing.startDate
-                options = { upsert: false };
+                options = { upsert: false }
                 finalInputData._id = existing._id
-                // TODO of course
+                // TODO of course !!!
                 // 2. Auto close a history / position when shares = 0
 
             // NO - add totally new Underlying position entry
@@ -196,11 +199,11 @@ module.exports = {
 
             // TODO - finish, later add various cost basis methods (user preference item?) AND tranches (allow sales to be taken from specific past orders - i.e. FIFO, LILO, etc.):
             // 3. Cost basis calculations
-            const costBasis = calculateCostBasisandShares({ underlyingTrades: allTrades } )
-            finalInputData.currentShares = costBasis.currentShares
-            finalInputData.rawCostBasis = costBasis.rawCostBasis
-            finalInputData.adjustedCostBasis = costBasis.adjustedCostBasis
-            finalInputData.minimumCostBasis = costBasis.minimumCostBasis
+            const costBasisData = calculateCostBasisandShares({ underlyingTrades: allTrades } )
+            finalInputData.currentShares = costBasisData.currentShares
+            finalInputData.rawCostBasis = costBasisData.rawCostBasis
+            finalInputData.adjustedCostBasis = costBasisData.adjustedCostBasis
+            finalInputData.minimumCostBasis = costBasisData.minimumCostBasis
 
             // TODO
             // 4. Target Prices
@@ -213,46 +216,115 @@ module.exports = {
 
             // 6. UPSERT
             let query = { _id: finalInputData._id }
-            updateQuery = existingTrade
+            updateQuery = existingPosition
                 ? { $push: {
-                        underlyingTrades: newTrade
-                    },
+                        underlyingTrades: newTrade },
                     $set: {
                         currentShares: finalInputData.currentShares,
                         rawCostBasis: finalInputData.rawCostBasis,
                         //TODO any other fields that must be upserted for existing positions!
                         targetPriceWeek: finalInputData.targetPriceWeek,
-                        targetPriceMonth: finalInputData.targetPriceMonth,
-                    }
-                    }
+                        targetPriceMonth: finalInputData.targetPriceMonth, } }
                 : { $set: finalInputData }
-            const res = await context.Underlying.updateOne(query, updateQuery, options)
+            const res = await context.Underlying
+                .updateOne( query, updateQuery, options )
             let returnDocument = {}
-            if (res.upsertedId) {
-                returnDocument = (await context.Underlying.findOne({ _id: res.upsertedId._id } ))
+            if ( res.upsertedId ) {
+                returnDocument = ( await context.Underlying
+                    .findOne( { _id: res.upsertedId._id } ) )
             } else {
-                returnDocument = (await context.Underlying.findOne({ _id: finalInputData._id } ))
+                returnDocument = ( await context.Underlying
+                    .findOne({  _id: finalInputData._id } ) )
             }
 
             // TODO return properly...
             return returnDocument
+        },
+        editUnderlying: async ( root, args, context ) => {
+            const rawInputData = args.input
+            const finalInputData = {
+                _id: rawInputData._id,
+                userId: rawInputData.userId,
+                startDate: rawInputData.startDate,
+                underlyingTrades: {
+                    _id: rawInputData.underlyingTrades._id,
+                    type: rawInputData.underlyingTrades.type,
+                    tradeDate: rawInputData.underlyingTrades.tradeDate,
+                    shares: rawInputData.underlyingTrades.shares,
+                    price: rawInputData.underlyingTrades.price,
+                }
+            }
+            console.log( rawInputData )
+            console.log( finalInputData )
 
+            const allTrades = []
+            const startDate = rawInputData.startDate
+            const options = { upsert: false }
+
+            const position = await context.Underlying
+                .findOne( {
+                    symbol: rawInputData.symbol,
+                    userId: rawInputData.userId,
+                    endDate: null } )
+            if( position && typeof( position ) !== "undefined" ) {
+                position.underlyingTrades
+                    .map( trade => {
+                        allTrades.push( trade ) } )
+                //finalInputData._id = existing._id
+                // TODO of course !!!
+                // 2. Auto close a history / position when shares = 0
+            }
+
+            // TODO - finish, later add various cost basis methods (user preference item?) AND tranches (allow sales to be taken from specific past orders - i.e. FIFO, LILO, etc.):
+            // 3. Cost basis calculations
+            const costBasisData = calculateCostBasisandShares({ underlyingTrades: allTrades } )
+            finalInputData.currentShares = costBasisData.currentShares
+            finalInputData.rawCostBasis = costBasisData.rawCostBasis
+            finalInputData.adjustedCostBasis = costBasisData.adjustedCostBasis
+            finalInputData.minimumCostBasis = costBasisData.minimumCostBasis
+
+            // TODO
+            // 4. Target Prices
+            const targetPriceData = calculatePriceTarget({ rawCostBasis: finalInputData.rawCostBasis, startDate: startDate } )
+            finalInputData.targetPriceWeek = targetPriceData.targetPriceWeek
+            finalInputData.targetPriceMonth = targetPriceData.targetPriceMonth
+
+            const query = { _id: finalInputData._id }
+            const updateQuery = {
+                $set: {
+                    underlyingTrades: newTrade,
+
+                    currentShares: finalInputData.currentShares,
+                    rawCostBasis: finalInputData.rawCostBasis,
+                    //TODO any other fields that must be upserted for existing positions!
+                    targetPriceWeek: finalInputData.targetPriceWeek,
+                    targetPriceMonth: finalInputData.targetPriceMonth, } }
+            const res = await context.Underlying
+                .updateOne( query, updateQuery, options )
+            let returnDocument = {}
+            if ( res.upsertedId ) {
+                returnDocument = ( await context.Underlying
+                    .findOne( { _id: res.upsertedId._id } ) )
+            } else {
+                returnDocument = ( await context.Underlying
+                    .findOne({  _id: finalInputData._id } ) )
+            }
+
+            // TODO return properly...
+            return returnDocument
         },
     },
     Date: new GraphQLScalarType({
         name: 'Date',
         description: 'Date custom scalar type',
-        parseValue(value) {
+        parseValue( value ) {
             return value; // value from the client
         },
-        serialize(value) {
-            return value; // value sent to the client
+        serialize( value ) {
+            return value // value sent to the client
         },
-        parseLiteral(ast) {
-            if (ast.kind === Kind.INT) {
-                return parseInt(ast.value, 10); // ast value is always in string format
-            }
-            return null;
-        },
-    }),
+        parseLiteral( ast) {
+            if ( ast.kind === Kind.INT ) return parseInt( ast.value, 10 ) // ast value is always in string format
+            return null
+        } } ),
 }

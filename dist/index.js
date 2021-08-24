@@ -1,4 +1,9 @@
-import 'babel-core/register';
-import 'babel-polyfill';
-import { start } from './server';
-start();
+'use strict';
+
+require('babel-core/register');
+
+require('babel-polyfill');
+
+var _server = require('./server');
+
+(0, _server.start)();

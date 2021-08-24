@@ -1,135 +1,158 @@
-import { MongoClient, ObjectId } from 'mongodb';
-import express from 'express';
-import cors from 'cors';
-import { prepare } from "./util";
-import { makeExecutableSchema } from 'graphql-tools';
+'use strict';
 
-const { graphqlHTTP } = require('express-graphql');
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.start = undefined;
 
-const MONGO_URL = 'mongodb://app:6%f)8iUfdERd883*@localhost:27017/sigmadb';
+var _express = require('express');
 
-export const start = async () => {
-    try {
-        const db = await MongoClient.connect(MONGO_URL);
+var _express2 = _interopRequireDefault(_express);
 
-        const Users = db.collection('users');
-        const Options = db.collection('options');
-        const Spreads = db.collection('spreads');
-        const Legs = db.collection('legs');
-        const UnderlyingTrades = db.collection('underlyingtrades');
-        const UnderlyingHistories = db.collection('underlyinghistories');
+var _bodyParser = require('body-parser');
 
-        const typeDefs = [`
-      type Query {
-        user(_id: String): User
-        users: [User]
-        option(_id: String): Option
-        options: [Option]
-        spread(_id: String): Spread
-        spreads: [Spread]
-        leg(_id: String): Leg
-        legs: [Leg]
-        underlyingtrade(_id: String): UnderlyingTrade
-        underlyingtrades: [UnderlyingTrade]
-        underlyinghistory(_id: String): UnderlyingHistory
-        underlyinghistories: [UnderlyingHistory]
-      }
-      type User {
-        _id: String
-        firstName: String
-        lastName: String
-        email: String
-        authType: String
-        password: String
-      }
-      type Option {
-        _id: String
-        ticker: String
-        type: String
-      }
-      type Spread {
-        _id: String
-        optionId: String
-        content: String
-        option: Option
-      }
-      type Leg {
-        _id: String
-        optionId: String
-        spreadId: String
-        content: String
-        option: Option
-      }
-      type UnderlyingTrade {
-        _id: String
-      }
-      type UnderlyingHistory {
-        _id: String
-      }
-      type Mutation {
-        createOption(ticker: String, type: String): Option
-        createSpread(optionId: String, content: String): Spread
-        createSpreadLeg(spreadId: String, content: String): Leg
-        createOptionLeg(optionId: String, content: String): Leg
-        createUnderlyingTrade() : UnderlyingTrade
-        createUnderlyingHistory() : UnderlyingHistory
-      }
-      schema {
-        query: Query
-        mutation: Mutation
-      }
-    `];
+var _bodyParser2 = _interopRequireDefault(_bodyParser);
 
-        const resolvers = {
-            Query: {
-                option: async (root, { _id }) => {
-                    return prepare((await Options.findOne(ObjectId(_id))));
-                },
-                options: async () => {
-                    return (await Options.find({}).toArray()).map(prepare);
-                },
-                comment: async (root, { _id }) => {
-                    return prepare((await Comments.findOne(ObjectId(_id))));
-                }
-            },
-            Post: {
-                comments: async ({ _id }) => {
-                    return (await Comments.find({ postId: _id }).toArray()).map(prepare);
-                }
-            },
-            Comment: {
-                post: async ({ postId }) => {
-                    return prepare((await Posts.findOne(ObjectId(postId))));
-                }
-            },
-            Mutation: {
-                createOption: async (root, args, context, info) => {
-                    const res = await Options.insertOne(args);
-                    return prepare(res.ops[0]); // https://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#~insertOneWriteOpResult
-                },
-                createComment: async (root, args) => {
-                    const res = await Comments.insert(args);
-                    return prepare((await Comments.findOne({ _id: res.insertedIds[1] })));
-                }
+var _cors = require('cors');
+
+var _cors2 = _interopRequireDefault(_cors);
+
+var _mongodb = require('mongodb');
+
+var _graphqlTools = require('graphql-tools');
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+require('dotenv').config();
+
+var session = require('express-session');
+var MongoDBStore = require('connect-mongodb-session')(session);
+
+var _require = require('express-graphql'),
+    graphqlHTTP = _require.graphqlHTTP;
+
+var _require2 = require('@graphql-tools/merge'),
+    mergeResolvers = _require2.mergeResolvers;
+
+var optionGQL = require('./types/options');
+var testGQL = require('./types/test');
+var typeDefs = [optionGQL, testGQL];
+
+var allQueries = require('./queries/allQueries');
+var oldResolvers = require('./mutations/allMutations');
+var resolversToMerge = [oldResolvers, allQueries];
+var resolvers = mergeResolvers(resolversToMerge);
+
+var start = exports.start = function _callee2() {
+    var db, app, corsOptions, store, schema, root;
+    return regeneratorRuntime.async(function _callee2$(_context2) {
+        while (1) {
+            switch (_context2.prev = _context2.next) {
+                case 0:
+                    _context2.prev = 0;
+                    _context2.next = 3;
+                    return regeneratorRuntime.awrap(_mongodb.MongoClient.connect(encodeURI(process.env.MONGO_URL)));
+
+                case 3:
+                    db = _context2.sent;
+                    app = (0, _express2.default)();
+
+
+                    app.use(_bodyParser2.default.json());
+
+                    // In case Node is running behind Nginx or similar proxy...
+                    app.set('trust proxy', 1);
+
+                    corsOptions = {
+                        credentials: true,
+                        origin: process.env.FRONTEND_URL
+                    };
+
+                    app.use((0, _cors2.default)(corsOptions));
+
+                    store = new MongoDBStore({
+                        uri: encodeURI(process.env.MONGO_URL),
+                        collection: 'sessions'
+                    });
+
+                    // Catch errors
+
+                    store.on('error', function (error) {
+                        console.error(error);
+                    });
+
+                    app.use(session({
+                        secret: process.env.STORE_SECRET,
+                        name: process.env.COOKIE_NAME,
+                        cookie: {
+                            maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+                            sameSite: false, // this may need to be false if you are accessing from another app
+                            httpOnly: true, // this must be false if you want to access the cookie
+                            secure: false //TODO true for HTTPS later...
+                        },
+                        store: store,
+                        // Boilerplate options, see:
+                        // * https://www.npmjs.com/package/express-session#resave
+                        // * https://www.npmjs.com/package/express-session#saveuninitialized
+                        resave: false,
+                        saveUninitialized: false,
+                        unset: 'destroy'
+                    }));
+
+                    schema = (0, _graphqlTools.makeExecutableSchema)({
+                        typeDefs: typeDefs,
+                        resolvers: resolvers
+                    });
+                    root = {};
+
+
+                    app.use('/graphql', _bodyParser2.default.json(), graphqlHTTP(function _callee(req) {
+                        return regeneratorRuntime.async(function _callee$(_context) {
+                            while (1) {
+                                switch (_context.prev = _context.next) {
+                                    case 0:
+                                        return _context.abrupt('return', {
+                                            schema: schema,
+                                            rootValue: root,
+                                            context: {
+                                                req: req,
+                                                session: req.session,
+                                                Users: db.collection('users'),
+                                                Sessions: db.collection('sessions'),
+                                                Dashboards: db.collection('dashboards'),
+                                                Options: db.collection('options'),
+                                                Underlying: db.collection('underlying'),
+                                                Banking: db.collection('banking')
+                                            },
+                                            graphiql: true
+                                        });
+
+                                    case 1:
+                                    case 'end':
+                                        return _context.stop();
+                                }
+                            }
+                        }, null, undefined);
+                    }));
+
+                    // TODO env configs!!! Deployment-worthy...
+                    app.listen(4000);
+                    console.log('Sigma GraphQL Backend API Started at http://localhost:4000/graphql');
+
+                    _context2.next = 22;
+                    break;
+
+                case 19:
+                    _context2.prev = 19;
+                    _context2.t0 = _context2['catch'](0);
+
+                    // TODO better error handling!
+                    console.log(_context2.t0);
+
+                case 22:
+                case 'end':
+                    return _context2.stop();
             }
-        };
-
-        const schema = makeExecutableSchema({
-            typeDefs,
-            resolvers
-        });
-
-        const app = express();
-
-        app.use('/graphql', graphqlHTTP({
-            schema: schema,
-            rootValue: root,
-            graphiql: true
-        }));
-
-        app.listen(4000);
-        console.log('Running a GraphQL API server at http://localhost:4000/graphql');
-    } catch (e) {
-        console.log(e);
-    }
+        }
+    }, null, undefined, [[0, 19]]);
 };

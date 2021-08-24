@@ -1,6 +1,6 @@
-# Sigma Option Tracker App
+# Sigma Option Tracker - Backend API
 
-Sigma Option Fund presents the Sigma Option Tracker. A full app meant to replace all the spreadsheets folks use to track options trades with better reporting, UI/UX, etc.
+Sigma Option Tracker backend API. A full app meant to replace all the spreadsheets folks use to track options trades with better reporting, UI/UX, etc.
 
 The app has two parts for now, a GraphQL NodeJS backend API and a React frontend.
 
@@ -10,13 +10,17 @@ To run the API backend in development:
 
 `npm run startdev`
 
-To setup and run the full API:
+To deploy the API with Docker:
 
 `npm install`
 
 `npm run build`
 
-`npm start`
+`docker-compose up --build` (using --build optionally to create a new image)
+
+Notes:
+1. In the Dockerfile make sure the ENV parameters are correct:
+2. Mainly if running the API container and trying to connect to the unique MongoDB container, then one needs to use 'host.docker.internal' instead of 'localhost' for MONGO_URL.
 
 
 Then access the server:
