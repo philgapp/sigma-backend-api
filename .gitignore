@@ -1,6 +1,15 @@
 
 .idea/
 
-.env
+dev.env
+prod.env
+
+prod.Dockerfile
+dev.Dockerfile
 
 node_modules/
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml

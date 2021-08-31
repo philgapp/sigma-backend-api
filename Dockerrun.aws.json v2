@@ -1,0 +1,16 @@
+{
+  "AWSEBDockerrunVersion": 2,
+  "Ports": [
+    {
+      "HostPort": "443",
+      "ContainerPort": "443"
+    }
+  ],
+  "Volumes": [
+    {
+      "HostDirectory": ".",
+      "ContainerDirectory": "."
+    }
+  ],
+  "Entrypoint": "npm start",
+}

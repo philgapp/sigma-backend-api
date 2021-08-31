@@ -60,7 +60,7 @@ export const start = async () => {
                 maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
                 sameSite: false, // this may need to be false if you are accessing from another app
                 httpOnly: true, // this must be false if you want to access the cookie
-                secure: false //TODO true for HTTPS later...
+                secure: process.env.SECURE_SESSION //
             },
             store: store,
             // Boilerplate options, see:

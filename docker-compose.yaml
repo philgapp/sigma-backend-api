@@ -1,10 +1,11 @@
 version: '3.3'
 services:
-  sigma-backend:
+  sigma-backend-api:
     build:
       context: .
+      dockerfile: prod.Dockerfile
     ports:
-      - "4000:4000"
+      - "443:443"
     networks:
       - sigmanet
 networks:
