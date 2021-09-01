@@ -136,8 +136,8 @@ var start = exports.start = function _callee2() {
                     }));
 
                     // TODO env configs!!! Deployment-worthy...
-                    app.listen(4000);
-                    console.log('Sigma GraphQL Backend API Started at http://localhost:4000/graphql');
+                    app.listen(process.env.PORT);
+                    console.log('Sigma GraphQL Backend API running on PORT 443');
 
                     _context2.next = 22;
                     break;
