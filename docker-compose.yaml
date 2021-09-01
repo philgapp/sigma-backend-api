@@ -8,5 +8,7 @@ services:
       - "443:443"
     networks:
       - sigmanet
+    volumes:
+      -./:./
 networks:
   sigmanet:

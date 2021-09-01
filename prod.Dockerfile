@@ -7,5 +7,6 @@ ENV FRONTEND_URL https://app.sigmaoptionfund.com
 ENV SECURE_SESSION true
 COPY . .
 RUN npm install
+RUN npm run build
 EXPOSE $PORT
 ENTRYPOINT ["npm", "start"]
