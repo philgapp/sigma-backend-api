@@ -96,9 +96,8 @@ export const start = async () => {
                 graphiql: true,
             })));
 
-        // TODO env configs!!! Deployment-worthy...
-        app.listen(4000);
-        console.log('Sigma GraphQL Backend API Started at http://localhost:4000/graphql');
+        app.listen(process.env.PORT);
+        console.log('Sigma GraphQL Backend API running on PORT ' + process.env.PORT);
 
     } catch (e) {
         // TODO better error handling!
