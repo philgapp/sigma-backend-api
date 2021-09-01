@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: ./prod.Dockerfile
     ports:
-      - "443:4000"
+      - "4000:4000"
     networks:
       - sigmanet
 networks:
